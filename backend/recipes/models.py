@@ -1,11 +1,17 @@
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 
 
 class Ingredient(models.Model):
-    name = models.CharField('Название', max_length=200)
-    measurement_unit = models.CharField('Единица измерения', max_length=200)
+    name = models.CharField(
+        'Название',
+        max_length=settings.MAX_LENGTH_INGREDIENT_NAME
+    )
+    measurement_unit = models.CharField(
+        'Единица измерения',
+        max_length=settings.MAX_LENGTH_INGREDIENT_MEASUREMENT_UNIT
+    )
 
     class Meta:
         verbose_name = 'Ингредиент'
@@ -30,7 +36,7 @@ class Recipe(models.Model):
         verbose_name='Автор'
     )
     name = models.CharField(
-        max_length=200,
+        max_length=settings.MAX_LENGTH_RECIPE_NAME,
         verbose_name='Название'
     )
     image = models.ImageField(
@@ -47,7 +53,10 @@ class Recipe(models.Model):
     )
     cooking_time = models.PositiveSmallIntegerField(
         'Время приготовления (в минутах)',
-        validators=[MinValueValidator(1)]
+        validators=[
+            MinValueValidator(settings.MIN_VALUE_RECIPE_COOKING_TIME),
+            MaxValueValidator(settings.MAX_VALUE_RECIPE_COOKING_TIME)
+        ]
     )
     pub_date = models.DateTimeField(
         auto_now_add=True,
@@ -78,18 +87,25 @@ class RecipeIngredient(models.Model):
     )
     amount = models.PositiveSmallIntegerField(
         'Количество',
-        validators=[MinValueValidator(1)]
+        validators=[
+            MinValueValidator(settings.MIN_VALUE_RECIPE_INGREDIENT_AMOUNT),
+            MaxValueValidator(settings.MAX_VALUE_RECIPE_INGREDIENT_AMOUNT)
+        ]
     )
 
     class Meta:
         verbose_name = 'Ингредиент рецепта'
         verbose_name_plural = 'Ингредиенты рецепта'
+        ordering = ['recipe']
         constraints = [
             models.UniqueConstraint(
                 fields=['recipe', 'ingredient'],
                 name='unique_recipe_ingredient'
             )
         ]
+
+    def __str__(self):
+        return f"{self.amount} {self.ingredient}(s) in {self.recipe}"
 
 
 class Favorite(models.Model):
@@ -109,12 +125,16 @@ class Favorite(models.Model):
     class Meta:
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранное'
+        ordering = ['user']
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
                 name='unique_favorite'
             )
         ]
+
+    def __str__(self):
+        return f"{self.user} like {self.recipe}"
 
 
 class ShoppingCart(models.Model):
@@ -134,9 +154,39 @@ class ShoppingCart(models.Model):
     class Meta:
         verbose_name = 'Список покупок'
         verbose_name_plural = 'Списки покупок'
+        ordering = ['user']
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
                 name='unique_shopping_cart'
             )
         ]
+
+    def __str__(self):
+        return f"{self.recipe} in {self.user}`s cart"
+
+
+class ShortLink(models.Model):
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='short_links',
+        verbose_name='Рецепт'
+    )
+    slug = models.CharField(
+        max_length=12,
+        unique=True,
+        verbose_name='Короткий идентификатор'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
+
+    class Meta:
+        verbose_name = 'Короткая ссылка'
+        verbose_name_plural = 'Короткие ссылки'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Short link for {self.recipe}'

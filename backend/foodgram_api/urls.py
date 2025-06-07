@@ -20,13 +20,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 
-from recipes.views import (
-    IngredientViewSet, RecipeViewSet
+from api.views import (
+    IngredientViewSet, RecipeViewSet,
+    ImprovedUserViewSet, ShortLinkRedirectView
 )
-from users.views import CustomTokenView, CustomUserViewSet
 
 router = DefaultRouter()
-router.register('users', CustomUserViewSet)
+router.register('users', ImprovedUserViewSet)
 router.register('ingredients', IngredientViewSet)
 router.register('recipes', RecipeViewSet)
 
@@ -34,6 +34,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api/', include('djoser.urls')),
-    path('api/auth/token/login/', CustomTokenView.as_view()),
-    path('api/auth/token/logout/', CustomTokenView.as_view()),
+    path('api/auth/', include('djoser.urls.authtoken')),
+    path('s/<str:slug>/', ShortLinkRedirectView.as_view()),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

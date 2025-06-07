@@ -24,9 +24,22 @@ load_dotenv(env_file)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
 FOODGRAM_ENV = os.getenv('FOODGRAM_ENV')
 SECRET_KEY = os.getenv('SECRET_KEY')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:80')
+
+MAX_LENGTH_INGREDIENT_NAME = 200
+MAX_LENGTH_INGREDIENT_MEASUREMENT_UNIT = 200
+MAX_LENGTH_RECIPE_NAME = 200
+MIN_VALUE_RECIPE_COOKING_TIME = 1
+MAX_VALUE_RECIPE_COOKING_TIME = 32000
+MIN_VALUE_RECIPE_INGREDIENT_AMOUNT = 1
+MAX_VALUE_RECIPE_INGREDIENT_AMOUNT = 32000
+
+MAX_LENGTH_USER_EMAIL = 254
+MAX_LENGTH_USER_USERNAME = 150
+MAX_LENGTH_USER_FIRST_NAME = 150
+MAX_LENGTH_USER_LAST_NAME = 150
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
@@ -47,8 +60,9 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'djoser',
     'django_filters',
-    'users',
+    'api',
     'recipes',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -170,18 +184,32 @@ DJOSER = {
     'LOGIN_FIELD': 'email',
     'HIDE_USERS': False,
     'SERIALIZERS': {
-        'user_create': 'users.serializers.CustomUserCreateSerializer',
-        'user': 'users.serializers.CustomUserSerializer',
-        'current_user': 'users.serializers.CustomUserSerializer',
+        'user_create': 'api.serializers.ImprovedUserCreateSerializer',
+        'user': 'api.serializers.ImprovedUserSerializer',
+        'current_user': 'api.serializers.ImprovedUserSerializer',
     },
     'PERMISSIONS': {
         'user': ['rest_framework.permissions.AllowAny'],
         'user_list': ['rest_framework.permissions.AllowAny'],
         'user_detail': ['rest_framework.permissions.AllowAny'],
+        'token_create': ['rest_framework.permissions.AllowAny'],
+        'token_destroy': ['rest_framework.permissions.IsAuthenticated'],
     },
     'USER_CREATE_PASSWORD_RETYPE': False,
     'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
     'AUTH_TOKEN_CLASSES': ['rest_framework.authtoken.models.Token'],
+    'HIDE_USERS': False,
+    'SEND_ACTIVATION_EMAIL': False,
+    'SEND_CONFIRMATION_EMAIL': False,
+    'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
+    'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
+    'ACTIVATION_URL': 'activate/{uid}/{token}',
+    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': True,
+    'USERNAME_RESET_SHOW_EMAIL_NOT_FOUND': True,
+    'PASSWORD_CHANGED_EMAIL_CONFIRMATION': False,
+    'USERNAME_CHANGED_EMAIL_CONFIRMATION': False,
+    'LOGOUT_ON_PASSWORD_CHANGE': False,
+    'CREATE_SESSION_ON_LOGIN': False,
 }
 
 AUTH_USER_MODEL = 'users.User'

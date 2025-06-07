@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
 from django.db import models
@@ -6,7 +7,7 @@ from django.db import models
 class User(AbstractUser):
     email = models.EmailField(
         'Email',
-        max_length=254,
+        max_length=settings.MAX_LENGTH_USER_EMAIL,
         unique=True,
         error_messages={
             'unique': 'Пользователь с таким email уже существует.'
@@ -15,7 +16,7 @@ class User(AbstractUser):
     )
     username = models.CharField(
         'Имя пользователя',
-        max_length=150,
+        max_length=settings.MAX_LENGTH_USER_USERNAME,
         unique=True,
         help_text='Введите имя пользователя',
         validators=[
@@ -31,12 +32,12 @@ class User(AbstractUser):
     )
     first_name = models.CharField(
         'Имя',
-        max_length=150,
+        max_length=settings.MAX_LENGTH_USER_FIRST_NAME,
         help_text='Введите имя'
     )
     last_name = models.CharField(
         'Фамилия',
-        max_length=150,
+        max_length=settings.MAX_LENGTH_USER_LAST_NAME,
         help_text='Введите фамилию'
     )
     avatar = models.ImageField(
@@ -80,6 +81,10 @@ class Follow(models.Model):
             models.UniqueConstraint(
                 fields=['user', 'author'],
                 name='unique_follow'
+            ),
+            models.CheckConstraint(
+                check=~models.Q(user=models.F('author')),
+                name='prevent_self_follow'
             )
         ]
 
