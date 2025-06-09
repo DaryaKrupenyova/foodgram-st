@@ -41,6 +41,8 @@ MAX_LENGTH_USER_USERNAME = 150
 MAX_LENGTH_USER_FIRST_NAME = 150
 MAX_LENGTH_USER_LAST_NAME = 150
 
+PAGINATOR_PAGE_SIZE = 6
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 

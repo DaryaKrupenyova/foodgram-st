@@ -1,6 +1,5 @@
 from django.conf import settings
-from django.contrib.auth import get_user_model, authenticate
-from django.core.validators import RegexValidator
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from djoser.serializers import UserCreateSerializer, UserSerializer
@@ -12,6 +11,7 @@ from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient,
     ShoppingCart
 )
+from users.validators import get_username_style_validator
 
 
 User = get_user_model()
@@ -25,11 +25,7 @@ class ImprovedUserCreateSerializer(UserCreateSerializer):
         max_length=settings.MAX_LENGTH_USER_USERNAME,
         validators=[
             UniqueValidator(queryset=User.objects.all()),
-            RegexValidator(
-                regex=r'^[\w.@+-]+$',
-                message='Имя пользователя может содержать только буквы,'
-                        ' цифры и символы @/./+/-/_'
-            )
+            get_username_style_validator()
         ]
     )
     password = serializers.CharField(write_only=True)
@@ -119,7 +115,9 @@ class PasswordResetSerializer(serializers.Serializer):
         try:
             validate_password(data['new_password'])
         except ValidationError as e:
-            raise serializers.ValidationError({'new_password': list(e.messages)})
+            raise serializers.ValidationError(
+                {'new_password': list(e.messages)}
+            )
         return data
 
     def save(self):
@@ -185,11 +183,6 @@ class RecipeIngredientCreateSerializer(serializers.ModelSerializer):
     id = serializers.PrimaryKeyRelatedField(
         queryset=Ingredient.objects.all()
     )
-    name = serializers.CharField(read_only=True, source='ingredient.name')
-    measurement_unit = serializers.CharField(
-        read_only=True,
-        source='ingredient.measurement_unit'
-    )
     amount = serializers.IntegerField(
         min_value=settings.MIN_VALUE_RECIPE_INGREDIENT_AMOUNT,
         max_value=settings.MAX_VALUE_RECIPE_INGREDIENT_AMOUNT
@@ -197,7 +190,7 @@ class RecipeIngredientCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RecipeIngredient
-        fields = ('id', 'name', 'measurement_unit', 'amount')
+        fields = ('id', 'amount')
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
@@ -207,9 +200,11 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         required=True
     )
     author = ImprovedUserSerializer(read_only=True)
-    is_favorited = serializers.SerializerMethodField()
-    is_in_shopping_cart = serializers.SerializerMethodField()
-    image = Base64ImageField(required=True, allow_null=False, allow_empty_file=False)
+    image = Base64ImageField(
+        required=True,
+        allow_null=False,
+        allow_empty_file=False
+    )
     cooking_time = serializers.IntegerField(
         min_value=settings.MIN_VALUE_RECIPE_COOKING_TIME,
         max_value=settings.MAX_VALUE_RECIPE_COOKING_TIME
@@ -239,10 +234,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        if 'recipe_ingredients' in validated_data:
-            ingredients_data = validated_data.pop('recipe_ingredients')
-            instance.ingredients.clear()
-            self._create_ingredients(instance, ingredients_data)
+        ingredients_data = validated_data.pop('recipe_ingredients')
+        instance.ingredients.clear()
+        self._create_ingredients(instance, ingredients_data)
         return super().update(instance, validated_data)
 
     def _create_ingredients(self, recipe, ingredients_data):
@@ -255,33 +249,14 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             for ingredient in ingredients_data
         ])
 
-    def get_is_favorited(self, obj):
-        user = self.context['request'].user
-        if user.is_anonymous:
-            return False
-        return user.favorites.filter(recipe=obj).exists()
-
-    def get_is_in_shopping_cart(self, obj):
-        user = self.context['request'].user
-        if user.is_anonymous:
-            return False
-        return user.shopping_cart.filter(recipe=obj).exists()
-
 
 class FavoriteSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source='recipe.name', read_only=True)
-    image = Base64ImageField(source='recipe.image', read_only=True)
-    cooking_time = serializers.IntegerField(
-        source='recipe.cooking_time',
-        read_only=True
-    )
-
     class Meta:
         model = Favorite
-        fields = ('id', 'user', 'recipe', 'name', 'image', 'cooking_time')
+        fields = ('user', 'recipe')
         extra_kwargs = {
-            'user': {'required': False, 'write_only': True},
-            'recipe': {'required': False, 'write_only': True},
+            'user': {'write_only': True},
+            'recipe': {'write_only': True},
         }
         validators = [
             UniqueTogetherValidator(
@@ -293,19 +268,12 @@ class FavoriteSerializer(serializers.ModelSerializer):
 
 
 class ShoppingCartSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source='recipe.name', read_only=True)
-    image = Base64ImageField(source='recipe.image', read_only=True)
-    cooking_time = serializers.IntegerField(
-        source='recipe.cooking_time',
-        read_only=True
-    )
-
     class Meta:
         model = ShoppingCart
-        fields = ('id', 'user', 'recipe', 'name', 'image', 'cooking_time')
+        fields = ('user', 'recipe')
         extra_kwargs = {
-            'user': {'required': False, 'write_only': True},
-            'recipe': {'required': False, 'write_only': True},
+            'user': {'write_only': True},
+            'recipe': {'write_only': True},
         }
         validators = [
             UniqueTogetherValidator(
@@ -316,10 +284,9 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
         ]
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
+class SubscriptionSerializer(ImprovedUserSerializer):
     recipes = serializers.SerializerMethodField()
-    recipes_count = serializers.SerializerMethodField()
-    is_subscribed = serializers.SerializerMethodField()
+    recipes_count = serializers.IntegerField(source='recipes.count')
 
     class Meta:
         model = User
@@ -342,12 +309,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             recipes,
             many=True
         ).data
-
-    def get_recipes_count(self, obj):
-        return obj.recipes.count()
-
-    def get_is_subscribed(self, obj):
-        return True
 
 
 class SubscriptionCreateSerializer(serializers.ModelSerializer):

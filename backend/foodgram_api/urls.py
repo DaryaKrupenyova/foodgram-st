@@ -22,8 +22,9 @@ from rest_framework.routers import DefaultRouter
 
 from api.views import (
     IngredientViewSet, RecipeViewSet,
-    ImprovedUserViewSet, ShortLinkRedirectView
+    ImprovedUserViewSet
 )
+from recipes.views import ShortLinkRedirectView
 
 router = DefaultRouter()
 router.register('users', ImprovedUserViewSet)

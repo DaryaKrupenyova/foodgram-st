@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import RegexValidator
 from django.db import models
+
+from users.validators import get_username_style_validator
 
 
 class User(AbstractUser):
@@ -20,11 +21,7 @@ class User(AbstractUser):
         unique=True,
         help_text='Введите имя пользователя',
         validators=[
-            RegexValidator(
-                regex=r'^[\w.@+-]+$',
-                message='Имя пользователя может содержать только буквы,'
-                        ' цифры и символы @/./+/-/_'
-            )
+            get_username_style_validator()
         ],
         error_messages={
             'unique': 'Пользователь с таким именем уже существует.'

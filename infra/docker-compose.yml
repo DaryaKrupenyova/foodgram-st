@@ -26,6 +26,7 @@ services:
       - ../backend/.env.dev
     volumes:
       - .././backend:/app
+      - .././data:/app/data
       - static_volume:/app/static
       - media_volume:/app/media
 

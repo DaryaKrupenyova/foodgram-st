@@ -35,6 +35,10 @@ else
     echo "Superuser created. Login: $DJANGO_SUPERUSER_EMAIL, Password: $DJANGO_SUPERUSER_PASSWORD"
     echo
 
+    echo "Loading ingridients..."
+    python manage.py load_ingredients
+    echo
+
     echo "Starting development server..."
     python manage.py runserver 0.0.0.0:8000
 fi

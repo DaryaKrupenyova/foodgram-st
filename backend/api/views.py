@@ -3,22 +3,17 @@ import string
 
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.conf import settings
-
 from django_filters.rest_framework import DjangoFilterBackend
-
 from djoser.views import UserViewSet
-
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from .filters import IngredientFilter, RecipeFilter
-from .pagination import CustomPageNumberPagination
+from .pagination import LimitedPageNumberPagination
 from .permissions import IsAuthorOrReadOnly
 from .serializers import (
     FavoriteSerializer, IngredientSerializer,
@@ -28,7 +23,6 @@ from .serializers import (
     PasswordResetSerializer, SubscriptionSerializer,
     SubscriptionCreateSerializer
 )
-
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient,
     ShoppingCart, ShortLink
@@ -49,7 +43,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     permission_classes = (IsAuthorOrReadOnly,)
-    pagination_class = CustomPageNumberPagination
+    pagination_class = LimitedPageNumberPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
 
@@ -59,14 +53,42 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return RecipeSerializer
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-        response_serializer = RecipeSerializer(
-            serializer.instance,
+        return serializer.save(author=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'request': self.request}
+        )
+        serializer.is_valid(raise_exception=True)
+        instance = self.perform_create(serializer=serializer)
+        instance_serializer = RecipeSerializer(
+            instance,
             context={'request': self.request}
         )
         return Response(
-            response_serializer.data,
+            data=instance_serializer.data,
             status=status.HTTP_201_CREATED
+        )
+
+    def perform_update(self, serializer):
+        return serializer.save(author=self.request.user)
+
+    def update(self, request, pk=None, *args, **kwargs):
+        self.get_object()
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'request': self.request}
+        )
+        serializer.is_valid(raise_exception=True)
+        instance = self.perform_create(serializer=serializer)
+        instance_serializer = RecipeSerializer(
+            instance,
+            context={'request': self.request}
+        )
+        return Response(
+            data=instance_serializer.data,
+            status=status.HTTP_200_OK
         )
 
     @action(
@@ -131,7 +153,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(data={
+                'id': recipe.id,
+                'name': recipe.name,
+                'image': str(recipe.image.url),
+                'cooking_time': recipe.cooking_time
+            }, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
             if not model.objects.filter(user=user, recipe=recipe).exists():
@@ -175,7 +202,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 class ImprovedUserViewSet(UserViewSet):
     queryset = User.objects.all()
     serializer_class = ImprovedUserSerializer
-    pagination_class = CustomPageNumberPagination
+    pagination_class = LimitedPageNumberPagination
     permission_classes = [AllowAny]
 
     def get_permissions(self):
@@ -214,7 +241,10 @@ class ImprovedUserViewSet(UserViewSet):
             recipes_limit = request.query_params.get('recipes_limit')
             response_serializer = SubscriptionSerializer(
                 author,
-                context={'recipes_limit': recipes_limit}
+                context={
+                    'recipes_limit': recipes_limit,
+                    'request': request
+                }
             )
             return Response(
                 response_serializer.data,
@@ -242,7 +272,10 @@ class ImprovedUserViewSet(UserViewSet):
         serializer = self.get_serializer(
             pages,
             many=True,
-            context={'recipes_limit': recipes_limit}
+            context={
+                'recipes_limit': recipes_limit,
+                'request': request
+            }
         )
         return self.get_paginated_response(serializer.data)
 
@@ -280,12 +313,3 @@ class ImprovedUserViewSet(UserViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ShortLinkRedirectView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, slug):
-        short_link = get_object_or_404(ShortLink, slug=slug)
-        frontend_url = settings.FRONTEND_URL.rstrip('/')
-        return HttpResponseRedirect(f'{frontend_url}/recipes/{short_link.recipe.id}/')
